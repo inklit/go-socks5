@@ -10,7 +10,8 @@ import (
 // during negotiation
 type AuthContext struct {
 	// Provided auth method
-	Method uint8
+	Method              uint8
+	OutgoingBindAddress string
 	// Payload provided during negotiation.
 	// Keys depend on the used auth method.
 	// For UserPass auth contains username/password
@@ -32,7 +33,7 @@ func (a NoAuthAuthenticator) GetCode() uint8 { return statute.MethodNoAuth }
 // Authenticate implement interface Authenticator
 func (a NoAuthAuthenticator) Authenticate(_ io.Reader, writer io.Writer, _ string) (*AuthContext, error) {
 	_, err := writer.Write([]byte{statute.VersionSocks5, statute.MethodNoAuth})
-	return &AuthContext{statute.MethodNoAuth, make(map[string]string)}, err
+	return &AuthContext{statute.MethodNoAuth, "", make(map[string]string)}, err
 }
 
 // UserPassAuthenticator is used to handle username/password based
@@ -57,7 +58,8 @@ func (a UserPassAuthenticator) Authenticate(reader io.Reader, writer io.Writer, 
 	}
 
 	// Verify the password
-	if !a.Credentials.Valid(string(nup.User), string(nup.Pass), userAddr) {
+	validCreds, bindIp := a.Credentials.Valid(string(nup.User), string(nup.Pass), userAddr)
+	if !validCreds {
 		if _, err := writer.Write([]byte{statute.UserPassAuthVersion, statute.AuthFailure}); err != nil {
 			return nil, err
 		}
@@ -70,6 +72,7 @@ func (a UserPassAuthenticator) Authenticate(reader io.Reader, writer io.Writer, 
 	// Done
 	return &AuthContext{
 		statute.MethodUserPassAuth,
+		bindIp,
 		map[string]string{
 			"username": string(nup.User),
 			"password": string(nup.Pass),

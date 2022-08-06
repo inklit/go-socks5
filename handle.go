@@ -4,9 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
+	"math/rand"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/things-go/go-socks5/statute"
 )
@@ -107,13 +111,22 @@ func (sf *Server) handleRequest(write io.Writer, req *Request) error {
 // handleConnect is used to handle a connect command
 func (sf *Server) handleConnect(ctx context.Context, writer io.Writer, request *Request) error {
 	// Attempt to connect
-	dial := sf.dial
-	if dial == nil {
-		dial = func(ctx context.Context, net_, addr string) (net.Conn, error) {
-			return net.Dial(net_, addr)
-		}
-	}
-	target, err := dial(ctx, "tcp", request.DestAddr.String())
+	log.Println("authctx connect:", request.AuthContext.OutgoingBindAddress)
+
+	//dial := sf.dial
+	//if dial == nil {
+	//		dial = func(ctx context.Context, net_, addr string) (net.Conn, error) {
+	//			return net.Dial(net_, addr)
+	//		}
+	//	}
+
+	//target, err := dial(ctx, "tcp", request.DestAddr.String())
+	remotetcpAddr, _ := net.ResolveTCPAddr("tcp4", request.DestAddr.String())
+	rand.Seed(time.Now().UnixNano())
+
+	localtcpAddr, _ := net.ResolveTCPAddr("tcp4", request.AuthContext.OutgoingBindAddress+":"+strconv.Itoa(rand.Intn(65564-1000)+1000))
+
+	target, err := net.DialTCP("tcp", localtcpAddr, remotetcpAddr)
 	if err != nil {
 		msg := err.Error()
 		resp := statute.RepHostUnreachable
